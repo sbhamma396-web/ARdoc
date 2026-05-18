@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARDocShield — Encodeur</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #020408;
+    --panel: #060d14;
+    --border: #0a2a3a;
+    --accent: #00e5ff;
+    --accent2: #00ff88;
+    --danger: #ff3b5c;
+    --text: #c8e6f0;
+    --muted: #3a6070;
+    --glow: 0 0 20px rgba(0,229,255,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Scan line animation */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -100%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: scanline 6s linear infinite;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.4;
+  }
+
+  @keyframes scanline {
+    0%   { top: -2px; }
+    100% { top: 100%; }
+  }
+
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 50px;
+  }
+
+  .logo {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 6px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    opacity: 0.7;
+  }
+
+  h1 {
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  h1 span {
+    color: var(--accent);
+    text-shadow: var(--glow);
+  }
+
+  .tagline {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 10px;
+    letter-spacing: 2px;
+  }
+
+  /* Status bar */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 10px 16px;
+    margin-bottom: 30px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--danger);
+    animation: pulse 2s infinite;
+  }
+
+  .status-dot.connected {
+    background: var(--accent2);
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  #status-text { color: var(--text); }
+
+  /* Panel */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    position: relative;
+    margin-bottom: 20px;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
+  }
+
+  .panel-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .panel-header span {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  .panel-num {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+
+  .panel-body { padding: 24px; }
+
+  /* Auth section */
+  .auth-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  /* Form elements */
+  .field { margin-bottom: 20px; }
+  .field:last-child { margin-bottom: 0; }
+
+  label {
+    display: block;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  input, textarea {
+    width: 100%;
+    background: rgba(0,229,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    padding: 12px 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    resize: vertical;
+  }
+
+  input:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(0,229,255,0.2), inset 0 0 20px rgba(0,229,255,0.03);
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  textarea { min-height: 120px; }
+
+  /* Token display */
+  #token-display {
+    background: rgba(0,255,136,0.05);
+    border: 1px solid rgba(0,255,136,0.2);
+    padding: 10px 14px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--accent2);
+    word-break: break-all;
+    display: none;
+    margin-top: 12px;
+    line-height: 1.6;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.1);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .btn:hover::after { opacity: 1; }
+  .btn:active { transform: scale(0.98); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    width: 100%;
+    justify-content: center;
+    font-size: 15px;
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 0 30px rgba(0,229,255,0.4);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  /* Loading state */
+  .btn-loading {
+    pointer-events: none;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(0,0,0,0.3);
+    border-top-color: #000;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Progress */
+  .progress-wrap {
+    display: none;
+    margin-top: 16px;
+  }
+
+  .progress-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .progress-bar {
+    height: 2px;
+    background: var(--border);
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* Alert */
+  .alert {
+    padding: 12px 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    margin-top: 16px;
+    display: none;
+    line-height: 1.6;
+  }
+
+  .alert-error {
+    background: rgba(255,59,92,0.1);
+    border: 1px solid rgba(255,59,92,0.3);
+    color: var(--danger);
+  }
+
+  .alert-success {
+    background: rgba(0,255,136,0.05);
+    border: 1px solid rgba(0,255,136,0.2);
+    color: var(--accent2);
+  }
+
+  /* Result */
+  .result-panel {
+    display: none;
+    background: var(--panel);
+    border: 1px solid rgba(0,255,136,0.3);
+    padding: 20px 24px;
+    margin-top: 20px;
+  }
+
+  .result-panel::before {
+    content: '';
+    display: block;
+    height: 1px;
+    background: linear-gradient(90deg, var(--accent2), transparent);
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+
+  .result-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--accent2);
+    letter-spacing: 3px;
+    margin-bottom: 16px;
+  }
+
+  .result-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .result-item label {
+    color: var(--muted);
+    font-size: 9px;
+    margin-bottom: 4px;
+  }
+
+  .result-item p {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    word-break: break-all;
+  }
+
+  .btn-download {
+    background: var(--accent2);
+    color: #000;
+    font-weight: 700;
+    padding: 12px 24px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    width: 100%;
+    transition: all 0.2s;
+  }
+
+  .btn-download:hover {
+    box-shadow: 0 0 30px rgba(0,255,136,0.4);
+  }
+
+  /* Log */
+  .log {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    max-height: 120px;
+    overflow-y: auto;
+    margin-top: 20px;
+  }
+
+  .log-line {
+    margin-bottom: 4px;
+    line-height: 1.6;
+  }
+
+  .log-line.ok { color: var(--accent2); }
+  .log-line.err { color: var(--danger); }
+  .log-line.info { color: var(--accent); }
+
+  /* Corner decorations */
+  .corner-tl, .corner-br {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+  }
+
+  .corner-tl {
+    top: -1px; left: -1px;
+    border-top: 2px solid var(--accent);
+    border-left: 2px solid var(--accent);
+  }
+
+  .corner-br {
+    bottom: -1px; right: -1px;
+    border-bottom: 2px solid var(--accent);
+    border-right: 2px solid var(--accent);
+  }
+
+  /* Divider */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 2px;
+  }
+
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    margin-top: 40px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">◈ Système de protection documentaire ◈</div>
+    <h1>AR<span>Doc</span>Shield</h1>
+    <div class="tagline">// PIPELINE D'ENCODAGE SÉCURISÉ — AES-256-GCM //</div>
+  </header>
+
+  <!-- Status -->
+  <div class="status-bar">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">NON CONNECTÉ — Authentification requise</span>
+    <span style="margin-left:auto;font-size:9px" id="status-time"></span>
+  </div>
+
+  <!-- STEP 1 : Auth -->
+  <div class="panel" style="position:relative">
+    <div class="corner-tl"></div>
+    <div class="corner-br"></div>
+    <div class="panel-header">
+      <span>⬡ Authentification</span>
+      <span class="panel-num">ÉTAPE 01 / 02</span>
+    </div>
+    <div class="panel-body">
+      <div class="auth-grid">
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="email" placeholder="admin@ardocshield.local" />
+        </div>
+        <div class="field">
+          <label>Mot de passe</label>
+          <input type="password" id="password" placeholder="••••••••" />
+        </div>
+      </div>
+      <button class="btn btn-secondary" id="btn-login" onclick="doLogin()">
+        ▶ &nbsp;Connexion au système
+      </button>
+      <div id="token-display"></div>
+      <div class="alert alert-error" id="auth-error"></div>
+    </div>
+  </div>
+
+  <!-- STEP 2 : Encoder -->
+  <div class="panel" style="position:relative">
+    <div class="corner-tl"></div>
+    <div class="corner-br"></div>
+    <div class="panel-header">
+      <span>⬡ Encodage du document</span>
+      <span class="panel-num">ÉTAPE 02 / 02</span>
+    </div>
+    <div class="panel-body">
+
+      <div class="field">
+        <label>Nom du document</label>
+        <input type="text" id="doc-nom" placeholder="ex: Dossier_Patient_Ahmed" />
+      </div>
+
+      <div class="field">
+        <label>Contenu à protéger</label>
+        <textarea id="doc-contenu" placeholder="Saisissez ici le contenu confidentiel du document...&#10;&#10;ex: Patient: Ahmed Ben Salem&#10;Diagnostic: ...&#10;Traitement: ..."></textarea>
+      </div>
+
+      <button class="btn btn-primary" id="btn-encode" onclick="doEncode()" disabled>
+        🔐 &nbsp;Encoder et générer PDF protégé
+      </button>
+
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-label">
+          <span id="progress-label-text">Chiffrement AES-256-GCM...</span>
+          <span id="progress-pct">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+      </div>
+
+      <div class="alert alert-error" id="encode-error"></div>
+
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="result-panel" id="result-panel">
+    <div class="result-title">▶ DOCUMENT ENCODÉ AVEC SUCCÈS</div>
+    <div class="result-info">
+      <div class="result-item">
+        <label>ID Document</label>
+        <p id="res-id">—</p>
+      </div>
+      <div class="result-item">
+        <label>Nom</label>
+        <p id="res-nom">—</p>
+      </div>
+      <div class="result-item">
+        <label>Algorithme</label>
+        <p>AES-256-GCM</p>
+      </div>
+      <div class="result-item">
+        <label>Statut</label>
+        <p style="color:var(--accent2)">✓ CHIFFRÉ + QR GÉNÉRÉ</p>
+      </div>
+    </div>
+    <button class="btn-download" id="btn-download" onclick="downloadPDF()">
+      ⬇ &nbsp;Télécharger le PDF protégé
+    </button>
+  </div>
+
+  <!-- Log -->
+  <div class="log" id="log">
+    <div class="log-line info">// ARDocShield encoder v1.0 — prêt</div>
+    <div class="log-line">// En attente d'authentification...</div>
+  </div>
+
+  <footer>
+    ARDocShield © 2026
+  </footer>
+
+</div>
+
+<script>
+  const API = 'http://localhost:3000';
+  let token = null;
+  let pdfBlob = null;
+  let docNom = '';
+
+  // Clock
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('status-time').textContent =
+      now.toLocaleTimeString('fr-FR') + ' — ' + now.toLocaleDateString('fr-FR');
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // Log helper
+  function log(msg, type = '') {
+    const logEl = document.getElementById('log');
+    const line = document.createElement('div');
+    line.className = 'log-line ' + type;
+    const time = new Date().toLocaleTimeString('fr-FR');
+    line.textContent = `[${time}] ${msg}`;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  // Show alert
+  function showAlert(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideAlert(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  // Progress animation
+  function animateProgress(steps) {
+    const wrap = document.getElementById('progress-wrap');
+    const fill = document.getElementById('progress-fill');
+    const label = document.getElementById('progress-label-text');
+    const pct = document.getElementById('progress-pct');
+    wrap.style.display = 'block';
+
+    let i = 0;
+    function next() {
+      if (i >= steps.length) return;
+      const [p, txt] = steps[i++];
+      fill.style.width = p + '%';
+      pct.textContent = p + '%';
+      label.textContent = txt;
+      if (i < steps.length) setTimeout(next, 600);
+    }
+    next();
+  }
+
+  // LOGIN
+  async function doLogin() {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    hideAlert('auth-error');
+
+    if (!email || !password) {
+      showAlert('auth-error', '⚠ Email et mot de passe requis');
+      return;
+    }
+
+    const btn = document.getElementById('btn-login');
+    btn.innerHTML = '<span class="spinner"></span> &nbsp;Connexion...';
+    btn.disabled = true;
+    log('Tentative de connexion : ' + email, 'info');
+
+    try {
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message || 'Échec connexion');
+
+      token = data.token;
+
+      // Update UI
+      const dot = document.getElementById('status-dot');
+      dot.classList.add('connected');
+      document.getElementById('status-text').textContent =
+        `CONNECTÉ — ${data.user.nom} (${data.user.role.toUpperCase()})`;
+
+      const tokenShort = token.substring(0, 40) + '...';
+      const td = document.getElementById('token-display');
+      td.textContent = '✓ TOKEN JWT : ' + tokenShort;
+      td.style.display = 'block';
+
+      btn.innerHTML = '✓ &nbsp;Authentifié';
+      btn.style.borderColor = 'var(--accent2)';
+      btn.style.color = 'var(--accent2)';
+
+      document.getElementById('btn-encode').disabled = false;
+      log(`Connexion réussie — rôle: ${data.user.role}`, 'ok');
+
+    } catch (err) {
+      showAlert('auth-error', '✗ ' + err.message);
+      btn.innerHTML = '▶ &nbsp;Connexion au système';
+      btn.disabled = false;
+      log('Erreur connexion : ' + err.message, 'err');
+    }
+  }
+
+  // ENCODE
+  async function doEncode() {
+    const nom = document.getElementById('doc-nom').value.trim();
+    const contenu = document.getElementById('doc-contenu').value.trim();
+    hideAlert('encode-error');
+    document.getElementById('result-panel').style.display = 'none';
+    pdfBlob = null;
+
+    if (!nom || !contenu) {
+      showAlert('encode-error', '⚠ Nom et contenu du document requis');
+      return;
+    }
+
+    const btn = document.getElementById('btn-encode');
+    btn.innerHTML = '<span class="spinner" style="border-top-color:#000"></span> &nbsp;Encodage en cours...';
+    btn.disabled = true;
+    docNom = nom;
+
+    animateProgress([
+      [15, 'Génération clé AES-256...'],
+      [35, 'Chiffrement AES-256-GCM...'],
+      [55, 'Génération QR code sécurisé...'],
+      [75, 'Construction PDF protégé...'],
+      [90, 'Finalisation du PDF...'],
+      [100, 'Terminé !']
+    ]);
+
+    log(`Encodage : "${nom}" (${contenu.length} caractères)`, 'info');
+
+    try {
+      const res = await fetch(`${API}/api/documents/encode-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ nom, contenu })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Erreur encodage');
+      }
+
+      pdfBlob = await res.blob();
+
+      // Show result
+      const panel = document.getElementById('result-panel');
+      document.getElementById('res-nom').textContent = nom;
+      document.getElementById('res-id').textContent = '—';
+      panel.style.display = 'block';
+
+      btn.innerHTML = '✓ &nbsp;PDF généré avec succès';
+      btn.style.background = 'var(--accent2)';
+      log(`PDF généré — "${nom}" — prêt au téléchargement`, 'ok');
+
+      setTimeout(() => {
+        btn.innerHTML = '🔐 &nbsp;Encoder un nouveau document';
+        btn.style.background = 'var(--accent)';
+        btn.disabled = false;
+        document.getElementById('progress-wrap').style.display = 'none';
+      }, 2000);
+
+    } catch (err) {
+      showAlert('encode-error', '✗ ' + err.message);
+      btn.innerHTML = '🔐 &nbsp;Encoder et générer PDF protégé';
+      btn.disabled = false;
+      document.getElementById('progress-wrap').style.display = 'none';
+      log('Erreur encodage : ' + err.message, 'err');
+    }
+  }
+
+  // DOWNLOAD
+  function downloadPDF() {
+    if (!pdfBlob) return;
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = docNom + '_encoded.pdf';
+    a.click();
+    URL.revokeObjectURL(url);
+    log(`PDF téléchargé : ${docNom}_encoded.pdf`, 'ok');
+  }
+
+  // Enter key on login
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      if (!token) doLogin();
+    }
+  });
+</script>
+
+</body>
+</html>
