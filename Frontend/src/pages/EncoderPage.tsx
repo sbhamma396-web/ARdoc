@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import documentService from '../services/documentService';
 
 const FileIcon = () => (
   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#00c9a7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -24,12 +25,6 @@ const LockIcon = () => (
   </svg>
 );
 
-const ChevronDownIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="6,9 12,15 18,9" />
-  </svg>
-);
-
 const CheckCircleIcon = () => (
   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#00c9a7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
@@ -47,12 +42,9 @@ const TrashIcon = () => (
 export default function EncoderPage() {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [encryption, setEncryption] = useState('AES-256-GCM (Recommandé)');
-  const [policy, setPolicy] = useState('Médical - CHU uniquement');
-  const [complexity, setComplexity] = useState('Niveau 3 - Maximum (Recommandé)');
-  const [validity, setValidity] = useState('7 jours');
   const [generating, setGenerating] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -76,19 +68,28 @@ export default function EncoderPage() {
     if (selected) setFile(selected);
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!file) return;
+
     setGenerating(true);
-    setTimeout(() => {
-      setGenerating(false);
+    setError('');
+
+    try {
+      await documentService.encodeFile(file, file.name.split('.')[0]);
       setSuccess(true);
-    }, 2500);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors du chiffrement du document');
+      console.error('Encode error:', err);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleReset = () => {
     setFile(null);
     setSuccess(false);
     setGenerating(false);
+    setError('');
   };
 
   const formatFileSize = (bytes: number) => {
@@ -122,7 +123,7 @@ export default function EncoderPage() {
               <strong>{file?.name}</strong> a été encodé avec succès
             </p>
             <p className="text-gray-400 text-xs mb-8">
-              Chiffrement : {encryption} • Validité : {validity} • Politique : {policy}
+              Chiffrement : AES-256-GCM • Le PDF a été téléchargé automatiquement
             </p>
             <div className="flex gap-3 justify-center">
               <button
@@ -130,11 +131,6 @@ export default function EncoderPage() {
                 className="px-6 py-3 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
               >
                 Encoder un autre document
-              </button>
-              <button
-                className="px-6 py-3 bg-[#00c9a7] text-white rounded-xl font-medium hover:bg-[#00b396] transition-colors"
-              >
-                Télécharger le document
               </button>
             </div>
           </div>
@@ -157,7 +153,7 @@ export default function EncoderPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.docx,.txt"
+                accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.gif"
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -181,7 +177,7 @@ export default function EncoderPage() {
                     <FileIcon />
                   </div>
                   <p className="text-gray-700 font-medium mb-1">Glissez-déposez votre document ici</p>
-                  <p className="text-[#00c9a7] text-sm mb-4">ou cliquez pour sélectionner un fichier (PDF, DOCX, TXT)</p>
+                  <p className="text-[#00c9a7] text-sm mb-4">ou cliquez pour sélectionner un fichier (PDF, DOCX, TXT, JPG, PNG, GIF)</p>
                   <button
                     onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
                     className="px-6 py-2.5 bg-[#1a2744] text-white rounded-xl font-semibold text-sm hover:bg-[#243460] transition-colors"
@@ -192,83 +188,11 @@ export default function EncoderPage() {
               )}
             </div>
 
-            {/* Settings Grid */}
-            <div className="grid grid-cols-2 gap-6 mb-8">
-              <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">Niveau de chiffrement</label>
-                <div className="relative">
-                  <select
-                    value={encryption}
-                    onChange={e => setEncryption(e.target.value)}
-                    className="w-full appearance-none px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00c9a7] bg-white text-gray-700"
-                  >
-                    <option>AES-256-GCM (Recommandé)</option>
-                    <option>AES-128-GCM</option>
-                    <option>ChaCha20-Poly1305</option>
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                    <ChevronDownIcon />
-                  </div>
-                </div>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+                {error}
               </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">Politique d'accès</label>
-                <div className="relative">
-                  <select
-                    value={policy}
-                    onChange={e => setPolicy(e.target.value)}
-                    className="w-full appearance-none px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00c9a7] bg-white text-gray-700"
-                  >
-                    <option>Médical - CHU uniquement</option>
-                    <option>Juridique - Avocats autorisés</option>
-                    <option>Industriel - Personnel accrédité</option>
-                    <option>Public - Accès libre</option>
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                    <ChevronDownIcon />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">Complexité des patterns</label>
-                <div className="relative">
-                  <select
-                    value={complexity}
-                    onChange={e => setComplexity(e.target.value)}
-                    className="w-full appearance-none px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00c9a7] bg-white text-gray-700"
-                  >
-                    <option>Niveau 3 - Maximum (Recommandé)</option>
-                    <option>Niveau 2 - Moyen</option>
-                    <option>Niveau 1 - Minimal</option>
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                    <ChevronDownIcon />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">Durée de validité</label>
-                <div className="relative">
-                  <select
-                    value={validity}
-                    onChange={e => setValidity(e.target.value)}
-                    className="w-full appearance-none px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00c9a7] bg-white text-gray-700"
-                  >
-                    <option>7 jours</option>
-                    <option>30 jours</option>
-                    <option>90 jours</option>
-                    <option>1 an</option>
-                    <option>Illimité</option>
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                    <ChevronDownIcon />
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-3">
@@ -295,7 +219,8 @@ export default function EncoderPage() {
               </button>
               <button
                 onClick={handleReset}
-                className="px-8 py-4 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                disabled={generating}
+                className="px-8 py-4 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 Annuler
               </button>
