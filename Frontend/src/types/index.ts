@@ -1,4 +1,4 @@
-export type Page = 'login' | 'dashboard' | 'encoder' | 'access' | 'scanner';
+export type Page = 'login' | 'dashboard' | 'encoder' | 'access' | 'scanner' | 'users';
 
 export type DocumentStatus = 'Actif' | 'Révoqué';
 export type DocumentType = 'Médical' | 'Juridique' | 'Industriel' | 'Éducation';
@@ -19,4 +19,20 @@ export interface ActivityItem {
   document: string;
   time: string;
   location: string;
+}
+
+export interface UserRow {
+  _id: string;
+  nom: string;
+  email: string;
+  role: string;
+  actif: boolean;
+  createdAt: string;
+}
+
+export interface UsersPageResponse {
+  users: UserRow[];
+  total: number;
+  page: number;
+  pages: number;
 }

@@ -81,6 +81,17 @@ export default function Navbar({ currentPage, onNavigate, onLogout }: NavbarProp
         </button>
 
         <button
+          onClick={() => onNavigate('users')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+            currentPage === 'users'
+              ? 'bg-[#00c9a7] text-white'
+              : 'text-gray-300 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          Utilisateurs
+        </button>
+
+        <button
           onClick={() => onNavigate('scanner')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 border ${
             currentPage === 'scanner'

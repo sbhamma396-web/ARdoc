@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Page } from '../types';
+import { authService } from '../services/authService';
 
 interface LoginPageProps {
   onLogin: (page: Page) => void;
@@ -53,15 +54,40 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [remember, setRemember] = useState(false);
   const [bioState, setBioState] = useState<'waiting' | 'scanning' | 'success'>('waiting');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handlePasswordLogin = (e: React.FormEvent) => {
+  const handlePasswordLogin = async (e: FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       setError('Veuillez remplir tous les champs.');
       return;
     }
+
     setError('');
-    onLogin('dashboard');
+    setSubmitting(true);
+
+    try {
+      const result = await authService.login({ email, password });
+      if (result.mfa_required) {
+        setError('MFA requis : veuillez vérifier votre application d’authentification.');
+        return;
+      }
+      onLogin('dashboard');
+    } catch (err: any) {
+      const apiMessage = err?.response?.data?.message || err?.response?.data?.error;
+      const status = err?.response?.status;
+      let message = apiMessage || err?.message || 'Impossible de se connecter.';
+
+      if (status === 429 && !apiMessage) {
+        message = 'Trop de tentatives. Réessayez dans quelques minutes.';
+      }
+
+      setError(message);
+      window.alert(message);
+      console.error('Login error:', err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleBiometricLogin = () => {
@@ -154,10 +180,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             )}
             <button
               type="submit"
-              className="w-full py-3.5 bg-[#00c9a7] text-white rounded-xl font-semibold text-sm hover:bg-[#00b396] transition-all duration-200 flex items-center justify-center gap-2 shadow-md shadow-[#00c9a7]/30"
+              disabled={submitting}
+              className={`w-full py-3.5 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md shadow-[#00c9a7]/30 ${
+                submitting ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-[#00c9a7] text-white hover:bg-[#00b396]'
+              }`}
             >
               <LockIcon />
-              Se connecter
+              {submitting ? 'Connexion...' : 'Se connecter'}
             </button>
           </form>
         ) : (

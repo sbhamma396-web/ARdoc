@@ -74,6 +74,11 @@ export const userService = {
     return response.data;
   },
 
+  createUser: async (payload: { nom: string; email: string; password: string; role: string }) => {
+    const response = await api.post('/auth/register', payload);
+    return response.data;
+  },
+
   deleteUser: async (userId: string) => {
     const response = await api.delete(`/users/${userId}`);
     return response.data;

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Document, DocumentStatus, DocumentType } from '../types';
-import { documents as initialDocuments } from '../data/mockData';
+import documentService from '../services/documentService';
 
 const UsersIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00c9a7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -190,7 +190,9 @@ function ConfigModal({ title, description, onClose }: ConfigModalProps) {
 }
 
 export default function AccessPage() {
-  const [documents, setDocuments] = useState<Document[]>(initialDocuments);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [docsError, setDocsError] = useState('');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('Tous les types');
   const [statusFilter, setStatusFilter] = useState('Tous les statuts');
@@ -200,9 +202,45 @@ export default function AccessPage() {
   const [revokeConfirm, setRevokeConfirm] = useState<string | null>(null);
 
   const handleRevoke = (id: string) => {
-    setDocuments(prev => prev.map(d => d.id === id ? { ...d, status: 'Révoqué' as DocumentStatus } : d));
-    setRevokeConfirm(null);
+    // Call backend to soft-delete the document (requires admin)
+    (async () => {
+      try {
+        await documentService.deleteDocument(id);
+        setDocuments(prev => prev.map(d => d.id === id ? { ...d, status: 'Révoqué' as DocumentStatus } : d));
+      } catch (err: any) {
+        console.error('Failed to revoke document', err);
+        setDocsError(err.response?.data?.message || 'Impossible de révoquer le document');
+      } finally {
+        setRevokeConfirm(null);
+      }
+    })();
   };
+
+  const loadDocuments = async () => {
+    setLoadingDocs(true);
+    setDocsError('');
+    try {
+      const docs = await documentService.listDocuments();
+      const mapped: Document[] = docs.map((d: any) => ({
+        id: d._id || d.id,
+        name: d.nom || d.original_name || 'Sans nom',
+        type: 'Médical' as DocumentType,
+        status: 'Actif' as DocumentStatus,
+        totalAccess: 0,
+        lastAccess: d.createdAt ? new Date(d.createdAt).toLocaleString('fr-FR') : ''
+      }));
+      setDocuments(mapped);
+    } catch (err: any) {
+      console.error('Error loading documents', err);
+      setDocsError(err.response?.data?.message || 'Impossible de charger les documents');
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDocuments();
+  }, []);
 
   const filtered = documents.filter(doc => {
     const matchSearch = doc.name.toLowerCase().includes(search.toLowerCase()) || doc.id.toLowerCase().includes(search.toLowerCase());
@@ -280,7 +318,7 @@ export default function AccessPage() {
         </div>
       </div>
 
-      {/* Table */}
+        {/* Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
         <table className="w-full">
           <thead>
@@ -297,7 +335,7 @@ export default function AccessPage() {
           <tbody className="divide-y divide-gray-50">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-10 text-gray-400 text-sm">Aucun document trouvé</td>
+                <td colSpan={7} className="text-center py-10 text-gray-400 text-sm">{loadingDocs ? 'Chargement...' : 'Aucun document trouvé'}</td>
               </tr>
             ) : (
               filtered.map(doc => (
@@ -338,6 +376,12 @@ export default function AccessPage() {
           </tbody>
         </table>
       </div>
+
+      {docsError && (
+        <div className="mb-4 rounded-2xl bg-red-50 border border-red-200 px-6 py-4 text-sm text-red-700">
+          {docsError}
+        </div>
+      )}
 
       {/* Feature Cards */}
       <div className="grid grid-cols-3 gap-4">

@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react';
-import { activityItems } from '../data/mockData';
+import userService from '../services/userService';
+
+type AuditLogEvent = {
+  _id: string;
+  user_id: { nom: string; email: string; role: string } | null;
+  document_id: { nom: string; file_type?: string } | null;
+  action: string;
+  status: string;
+  createdAt: string;
+};
 
 const FileIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -74,35 +83,78 @@ const ShieldSmIcon = () => (
   </svg>
 );
 
-const stats = [
-  { label: 'Documents protégés', value: '1,247', icon: <FileIcon />, bg: 'bg-blue-500', iconBg: 'bg-blue-500' },
-  { label: 'Accès accordés', value: '8,532', icon: <CheckIcon />, bg: 'bg-[#00c9a7]', iconBg: 'bg-[#00c9a7]' },
-  { label: 'Accès refusés', value: '124', icon: <AlertIcon />, bg: 'bg-orange-500', iconBg: 'bg-orange-500' },
-  { label: 'Utilisateurs actifs', value: '342', icon: <UsersIcon />, bg: 'bg-purple-500', iconBg: 'bg-purple-500' },
+type DashboardStats = {
+  users: { total: number; active: number; inactive: number };
+  documents: { total: number };
+  access: {
+    today: { total: number; granted: number; denied: number };
+    week: { total: number };
+    month: { total: number };
+    successRate: number;
+  };
+};
+
+const defaultCards = [
+  { label: 'Documents protégés', value: '...', icon: <FileIcon />, bg: 'bg-blue-500', iconBg: 'bg-blue-500' },
+  { label: 'Accès accordés', value: '...', icon: <CheckIcon />, bg: 'bg-[#00c9a7]', iconBg: 'bg-[#00c9a7]' },
+  { label: 'Accès refusés', value: '...', icon: <AlertIcon />, bg: 'bg-orange-500', iconBg: 'bg-orange-500' },
+  { label: 'Utilisateurs actifs', value: '...', icon: <UsersIcon />, bg: 'bg-purple-500', iconBg: 'bg-purple-500' },
 ];
 
 export default function DashboardPage() {
-  const [activities, setActivities] = useState(activityItems);
-  const [_counter, setCounter] = useState(0);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEvent[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [activityError, setActivityError] = useState('');
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [statsError, setStatsError] = useState('');
+
+  const cards = dashboardStats ? [
+    { label: 'Documents protégés', value: dashboardStats.documents.total.toString(), icon: <FileIcon />, bg: 'bg-blue-500', iconBg: 'bg-blue-500' },
+    { label: 'Accès accordés', value: dashboardStats.access.today.granted.toString(), icon: <CheckIcon />, bg: 'bg-[#00c9a7]', iconBg: 'bg-[#00c9a7]' },
+    { label: 'Accès refusés', value: dashboardStats.access.today.denied.toString(), icon: <AlertIcon />, bg: 'bg-orange-500', iconBg: 'bg-orange-500' },
+    { label: 'Utilisateurs actifs', value: dashboardStats.users.active.toString(), icon: <UsersIcon />, bg: 'bg-purple-500', iconBg: 'bg-purple-500' },
+  ] : defaultCards;
+
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const loadLiveActivity = async () => {
+    setLoadingActivities(true);
+    setActivityError('');
+    try {
+      const response = await userService.getAuditLogs(1, 200);
+      setAuditLogs(response.logs);
+    } catch (err: any) {
+      setActivityError(err.response?.data?.message || 'Impossible de charger l\'activité');
+    } finally {
+      setLoadingActivities(false);
+    }
+  };
+
+  const loadDashboardStats = async () => {
+    setLoadingStats(true);
+    setStatsError('');
+    try {
+      const data = await userService.getDashboardStats();
+      setDashboardStats(data);
+    } catch (err: any) {
+      setStatsError(err.response?.data?.message || 'Impossible de charger les statistiques');
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCounter(c => c + 1);
-      // Simulate new activity
-      const newNames = ['Dr. Paul Renard', 'Mme. Laure Simon', 'M. Eric Blanc', 'Prof. Anne Duval'];
-      const newDocs = ['Dossier médical #9012', 'Rapport confidentiel #3345', 'Plan stratégique #7890'];
-      const newLocs = ['CHU Lille', 'Siège Paris 8', 'Usine Marseille', 'Bureau Lyon'];
-      const types: ('Accès accordé' | 'Accès refusé')[] = ['Accès accordé', 'Accès refusé'];
-      const newActivity = {
-        id: Date.now().toString(),
-        user: newNames[Math.floor(Math.random() * newNames.length)],
-        accessType: types[Math.floor(Math.random() * types.length)],
-        document: newDocs[Math.floor(Math.random() * newDocs.length)],
-        time: 'À l\'instant',
-        location: newLocs[Math.floor(Math.random() * newLocs.length)],
-      };
-      setActivities(prev => [newActivity, ...prev.slice(0, 4)]);
-    }, 8000);
+    loadLiveActivity();
+    loadDashboardStats();
+    const interval = setInterval(loadLiveActivity, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -130,8 +182,13 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Cards */}
+      {statsError ? (
+        <div className="mb-6 rounded-2xl bg-red-50 border border-red-200 px-6 py-4 text-sm text-red-700">
+          {statsError}
+        </div>
+      ) : null}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        {stats.map((stat, i) => (
+        {cards.map((stat, i) => (
           <div key={i} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
             <div className={`w-12 h-12 ${stat.iconBg} rounded-xl flex items-center justify-center text-white mb-4`}>
               {stat.icon}
@@ -155,34 +212,45 @@ export default function DashboardPage() {
           </span>
         </div>
         <div className="divide-y divide-gray-50">
-          {activities.map((item, index) => (
-            <div
-              key={item.id}
-              className={`px-6 py-4 flex items-start justify-between transition-all duration-500 ${index === 0 ? 'bg-[#00c9a7]/5' : ''}`}
-            >
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold text-gray-900 text-sm">{item.user}</span>
-                  <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
-                    item.accessType === 'Accès accordé'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-red-100 text-red-600'
-                  }`}>
-                    {item.accessType}
-                  </span>
+          {activityError ? (
+            <div className="px-6 py-8 text-center text-red-600">{activityError}</div>
+          ) : loadingActivities ? (
+            <div className="px-6 py-8 text-center text-gray-500">Chargement de l'activité...</div>
+          ) : auditLogs.length === 0 ? (
+            <div className="px-6 py-8 text-center text-gray-500">Aucun événement récent trouvé.</div>
+          ) : (
+            auditLogs.map((event, index) => {
+              const userName = typeof event.user_id === 'object' ? event.user_id.nom : 'Utilisateur inconnu';
+              const documentName = event.document_id && typeof event.document_id === 'object' ? event.document_id.nom : 'Document inconnu';
+              const statusLabel = event.status === 'SUCCESS' ? 'Succès' : event.status === 'DENIED' ? 'Refusé' : event.status;
+              const location = typeof event.user_id === 'object' ? event.user_id.role : 'N/A';
+              return (
+                <div
+                  key={event._id}
+                  className={`px-6 py-4 flex flex-col gap-3 transition-all duration-500 ${index === 0 ? 'bg-[#00c9a7]/5' : ''}`}
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-gray-900 text-sm">{userName}</span>
+                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 font-medium">{statusLabel}</span>
+                      </div>
+                      <div className="text-sm text-gray-500">{event.action}</div>
+                    </div>
+                    <div className="text-right text-xs text-gray-400">
+                      {formatTime(event.createdAt)}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center text-sm text-gray-500">
+                    {event.document_id && typeof event.document_id === 'object' && event.document_id.nom ? (
+                      <span>Document : {documentName}</span>
+                    ) : null}
+                    <span>Rôle : {location}</span>
+                  </div>
                 </div>
-                <div className="text-sm text-gray-500">{item.document}</div>
-                <div className="flex items-center gap-4 mt-1">
-                  <span className="flex items-center gap-1 text-xs text-gray-400">
-                    <ClockIcon /> {item.time}
-                  </span>
-                  <span className="flex items-center gap-1 text-xs text-gray-400">
-                    <MapPinIcon /> {item.location}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
+              );
+            })
+          )}
         </div>
       </div>
     </div>

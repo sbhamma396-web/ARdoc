@@ -49,9 +49,6 @@ export const authService = {
 
   login: async (data: LoginPayload) => {
     const response = await api.post('/auth/login', data);
-    if (response.data.token) {
-      localStorage.setItem('access_token', response.data.token);
-    }
     return response.data;
   },
 
@@ -79,9 +76,6 @@ export const authService = {
 
   verifyMFA: async (mfaToken: string, code: string) => {
     const response = await api.post('/auth/mfa/verify', { mfa_token: mfaToken, code });
-    if (response.data.token) {
-      localStorage.setItem('access_token', response.data.token);
-    }
     return response.data;
   },
 

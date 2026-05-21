@@ -39,9 +39,6 @@ export const documentService = {
     }
 
     const response = await api.post('/documents/encode', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
       responseType: 'blob',
     });
 
